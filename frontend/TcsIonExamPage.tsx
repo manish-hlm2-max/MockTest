@@ -170,10 +170,73 @@ const TcsIonEngine: React.FC = () => {
     resumeExam,
   } = useTestEngine();
 
-  // Initialize session on mount
+  // Initialize session on mount (checking for resume)
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`tb_frontend_ongoing_session_${mockExamSession.testId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.status === 'ONGOING') {
+            initSession(mockExamSession, 3, {
+              responses: parsed.responses,
+              timeRemaining: parsed.timeRemaining,
+              violationsCount: parsed.violationsCount,
+              currentSectionIndex: parsed.currentSectionIndex,
+              currentQuestionIndex: parsed.currentQuestionIndex,
+            });
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse ongoing session:", e);
+        }
+      }
+    }
     initSession(mockExamSession, 3); // 3 violations allowed
   }, [initSession]);
+
+  // Save state on unload/unmount
+  useEffect(() => {
+    const handleSave = () => {
+      if (state.session && !state.isExamSubmitted) {
+        const record = {
+          testId: state.session.testId,
+          status: 'ONGOING',
+          timeRemaining: state.timeRemaining,
+          violationsCount: state.violationsCount,
+          responses: state.responses,
+          currentSectionIndex: state.currentSectionIndex,
+          currentQuestionIndex: state.currentQuestionIndex,
+        };
+        localStorage.setItem(
+          `tb_frontend_ongoing_session_${state.session.testId}`,
+          JSON.stringify(record)
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', handleSave);
+
+    return () => {
+      handleSave();
+      window.removeEventListener('beforeunload', handleSave);
+    };
+  }, [
+    state.session,
+    state.isExamSubmitted,
+    state.timeRemaining,
+    state.violationsCount,
+    state.responses,
+    state.currentSectionIndex,
+    state.currentQuestionIndex
+  ]);
+
+  // Clean up ongoing session on exam submission
+  useEffect(() => {
+    if (state.isExamSubmitted && state.session) {
+      localStorage.removeItem(`tb_frontend_ongoing_session_${state.session.testId}`);
+    }
+  }, [state.isExamSubmitted, state.session]);
 
   if (!state.session) {
     return (

@@ -167,8 +167,14 @@ export default function MockTestsCatalog() {
     alert(`Success! You have unlocked ${newTier}. You can now start the mock test.`);
   };
 
+  const getTestStatus = (testId: string) => {
+    const session = currentUser?.testSessions?.find(s => s.testId === testId);
+    return session?.status || null; // 'COMPLETED' | 'AUTO_SUBMITTED' | 'ONGOING' | null
+  };
+
   const isCompleted = (testId: string) => {
-    return currentUser?.testSessions?.some(s => s.testId === testId);
+    const status = getTestStatus(testId);
+    return status === 'COMPLETED' || status === 'AUTO_SUBMITTED';
   };
 
   return (
@@ -424,6 +430,7 @@ export default function MockTestsCatalog() {
                     );
 
                     const completed = isCompleted(test.id);
+                    const ongoing = getTestStatus(test.id) === 'ONGOING';
 
                     return (
                       <div
@@ -442,7 +449,12 @@ export default function MockTestsCatalog() {
                               {test.requiredTier === 'None' ? 'FREE TEST' : test.requiredTier}
                             </span>
                             
-                            {hasPass && !completed && (
+                            {ongoing && (
+                              <span className="flex items-center gap-1 text-[9px] bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400 border border-orange-300 dark:border-orange-850 px-1.5 py-0.5 rounded font-black uppercase">
+                                ⏸ Paused
+                              </span>
+                            )}
+                            {hasPass && !completed && !ongoing && (
                               <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 border border-green-300 dark:border-green-800 px-1.5 py-0.5 rounded font-bold">
                                 <Check className="h-3 w-3" /> UNLOCKED
                               </span>
@@ -485,12 +497,14 @@ export default function MockTestsCatalog() {
                           className={`w-full text-center py-2.5 rounded-lg text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer ${
                             completed
                               ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-950/20'
+                              : ongoing
+                              ? 'bg-orange-650 hover:bg-orange-700 text-white shadow-orange-950/20 font-bold'
                               : hasPass
                               ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-900/20'
                               : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-yellow-900/20'
                           }`}
                         >
-                          {completed ? 'View Solution & Analysis' : hasPass ? 'Start Test' : 'Unlock with Pass'}
+                          {completed ? 'View Solution & Analysis' : ongoing ? 'Resume Test' : hasPass ? 'Start Test' : 'Unlock with Pass'}
                         </button>
                       </div>
                     );

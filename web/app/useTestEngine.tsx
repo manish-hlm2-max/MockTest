@@ -87,7 +87,7 @@ export interface EngineState {
 }
 
 type EngineAction =
-  | { type: 'INIT_SESSION'; payload: { session: ActiveSession; maxViolations?: number } }
+  | { type: 'INIT_SESSION'; payload: { session: ActiveSession; maxViolations?: number; resumeData?: { responses: Record<string, QuestionResponse>; timeRemaining: number; violationsCount: number; currentSectionIndex?: number; currentQuestionIndex?: number } } }
   | { type: 'SET_LANGUAGE'; payload: 'en' | 'hi' }
   | { type: 'TICK_TIMER' }
   | { type: 'SELECT_OPTION'; payload: { optionIndex: number | null } }
@@ -130,39 +130,55 @@ function engineReducer(state: EngineState, action: EngineAction): EngineState {
 
   switch (action.type) {
     case 'INIT_SESSION': {
-      const { session, maxViolations = 3 } = action.payload;
-      const initialResponses: Record<string, QuestionResponse> = {};
+      const { session, maxViolations = 3, resumeData } = action.payload;
+      let initialResponses: Record<string, QuestionResponse> = {};
+      let initialTimeRemaining = session.totalDurationSeconds;
+      let initialViolationsCount = 0;
+      let initialSectionIndex = 0;
+      let initialQuestionIndex = 0;
 
-      // Initialize all questions to state 1 (NOT_VISITED)
-      session.questions.forEach((q) => {
-        initialResponses[q.id] = {
-          questionId: q.id,
-          selectedOptionIndex: null,
-          tempOptionIndex: null,
-          state: 1, // NOT_VISITED
-          elapsedSeconds: 0,
-        };
-      });
+      if (resumeData) {
+        initialResponses = resumeData.responses;
+        initialTimeRemaining = resumeData.timeRemaining;
+        initialViolationsCount = resumeData.violationsCount;
+        if (resumeData.currentSectionIndex !== undefined) {
+          initialSectionIndex = resumeData.currentSectionIndex;
+        }
+        if (resumeData.currentQuestionIndex !== undefined) {
+          initialQuestionIndex = resumeData.currentQuestionIndex;
+        }
+      } else {
+        // Initialize all questions to state 1 (NOT_VISITED)
+        session.questions.forEach((q) => {
+          initialResponses[q.id] = {
+            questionId: q.id,
+            selectedOptionIndex: null,
+            tempOptionIndex: null,
+            state: 1, // NOT_VISITED
+            elapsedSeconds: 0,
+          };
+        });
 
-      // Mark the very first question of the first section as state 2 (NOT_ANSWERED)
-      const firstSectionQuestions = getSectionQuestions(session, 0);
-      if (firstSectionQuestions.length > 0) {
-        const firstQuestionId = firstSectionQuestions[0].id;
-        initialResponses[firstQuestionId] = {
-          ...initialResponses[firstQuestionId],
-          state: 2, // NOT_ANSWERED
-        };
+        // Mark the very first question of the first section as state 2 (NOT_ANSWERED)
+        const firstSectionQuestions = getSectionQuestions(session, 0);
+        if (firstSectionQuestions.length > 0) {
+          const firstQuestionId = firstSectionQuestions[0].id;
+          initialResponses[firstQuestionId] = {
+            ...initialResponses[firstQuestionId],
+            state: 2, // NOT_ANSWERED
+          };
+        }
       }
 
       return {
         session,
-        currentSectionIndex: 0,
-        currentQuestionIndex: 0,
+        currentSectionIndex: initialSectionIndex,
+        currentQuestionIndex: initialQuestionIndex,
         responses: initialResponses,
-        timeRemaining: session.totalDurationSeconds,
+        timeRemaining: initialTimeRemaining,
         isTimerRunning: true,
         language: 'en',
-        violationsCount: 0,
+        violationsCount: initialViolationsCount,
         maxViolationsAllowed: maxViolations,
         isExamSubmitted: false,
         isSyncing: false,
@@ -509,7 +525,7 @@ function engineReducer(state: EngineState, action: EngineAction): EngineState {
 
 interface TestEngineContextType {
   state: EngineState;
-  initSession: (session: ActiveSession, maxViolations?: number) => void;
+  initSession: (session: ActiveSession, maxViolations?: number, resumeData?: { responses: Record<string, QuestionResponse>; timeRemaining: number; violationsCount: number; currentSectionIndex?: number; currentQuestionIndex?: number }) => void;
   selectOption: (optionIndex: number | null) => void;
   saveAndNext: () => void;
   clearResponse: () => void;
@@ -560,8 +576,12 @@ export const TestEngineProvider: React.FC<TestEngineProviderProps> = ({
   });
 
   // Action Dispatch wrappers
-  const initSession = useCallback((session: ActiveSession, maxViolations?: number) => {
-    dispatch({ type: 'INIT_SESSION', payload: { session, maxViolations } });
+  const initSession = useCallback((
+    session: ActiveSession,
+    maxViolations?: number,
+    resumeData?: { responses: Record<string, QuestionResponse>; timeRemaining: number; violationsCount: number; currentSectionIndex?: number; currentQuestionIndex?: number }
+  ) => {
+    dispatch({ type: 'INIT_SESSION', payload: { session, maxViolations, resumeData } });
   }, []);
 
   const selectOption = useCallback((optionIndex: number | null) => {

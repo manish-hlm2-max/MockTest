@@ -14,6 +14,9 @@ export interface MockTestRecord {
   violations: number;
   date: string;
   responses?: Record<string, { selectedOptionIndex: number | null; elapsedSeconds: number; }>;
+  timeRemaining?: number;
+  currentSectionIndex?: number;
+  currentQuestionIndex?: number;
 }
 
 export interface Notice {
@@ -79,6 +82,15 @@ interface AuthContextType {
     tier: MockUser['subscriptionTier'],
     purchasedAt: string | null,
     expiry: string | null
+  ) => void;
+  saveOngoingSession: (
+    testId: string,
+    title: string,
+    timeRemaining: number,
+    violations: number,
+    responses: any,
+    currentSectionIndex?: number,
+    currentQuestionIndex?: number
   ) => void;
   noticesList: Notice[];
   addNotice: (title: string, type: string, category: 'notice' | 'result' | 'admit_card', date?: string, url?: string, lastDateInput?: string) => void;
@@ -462,7 +474,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       responses
     };
 
-    const updatedSessions = [newRecord, ...currentUser.testSessions];
+    const filteredSessions = currentUser.testSessions.filter(
+      s => !(s.testId === testId && s.status === 'ONGOING')
+    );
+    const updatedSessions = [newRecord, ...filteredSessions];
+    const updatedUser = { ...currentUser, testSessions: updatedSessions };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('tb_session', JSON.stringify(updatedUser));
+
+    const updatedList = usersList.map(u => u.id === currentUser.id ? updatedUser : u);
+    setUsersList(updatedList);
+    localStorage.setItem('tb_users', JSON.stringify(updatedList));
+  };
+
+  const saveOngoingSession = (
+    testId: string,
+    title: string,
+    timeRemaining: number,
+    violations: number,
+    responses: any,
+    currentSectionIndex?: number,
+    currentQuestionIndex?: number
+  ) => {
+    if (!currentUser) return;
+
+    const existingIndex = currentUser.testSessions.findIndex(
+      s => s.testId === testId && s.status === 'ONGOING'
+    );
+
+    const record: MockTestRecord = {
+      id: existingIndex >= 0 ? currentUser.testSessions[existingIndex].id : 'ts_' + Math.random().toString(36).substring(2, 9),
+      testId,
+      title,
+      score: 0,
+      maxScore: 0,
+      accuracy: 0,
+      durationSeconds: 0,
+      status: 'ONGOING',
+      violations,
+      date: new Date().toISOString().split('T')[0],
+      responses,
+      timeRemaining,
+      currentSectionIndex,
+      currentQuestionIndex
+    };
+
+    let updatedSessions = [...currentUser.testSessions];
+    if (existingIndex >= 0) {
+      updatedSessions[existingIndex] = record;
+    } else {
+      updatedSessions = [record, ...updatedSessions];
+    }
+
     const updatedUser = { ...currentUser, testSessions: updatedSessions };
     setCurrentUser(updatedUser);
     localStorage.setItem('tb_session', JSON.stringify(updatedUser));
@@ -571,6 +634,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleBookmark,
         resetAttempt,
         saveUserProfileByAdmin,
+        saveOngoingSession,
         noticesList,
         addNotice,
         deleteNotice

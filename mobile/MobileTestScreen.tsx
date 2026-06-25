@@ -60,10 +60,66 @@ export default function MobileTestScreen() {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [timeLeft, setTimeLeft] = useState<number>(1800); // 30 mins
   const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
+  const [activeTestId, setActiveTestId] = useState<string | null>(null);
+  const [ongoingSessions, setOngoingSessions] = useState<Record<string, any>>({});
+
+  // Load saved sessions on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tb_mobile_sessions');
+      if (saved) {
+        try {
+          setOngoingSessions(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse ongoing sessions:", e);
+        }
+      }
+    }
+  }, []);
+
+  const saveSession = (testId: string, qList: Question[], curIdx: number, time: number, status: 'ONGOING' | 'COMPLETED') => {
+    const updated = {
+      ...ongoingSessions,
+      [testId]: {
+        testId,
+        questions: qList,
+        currentIndex: curIdx,
+        timeLeft: time,
+        status
+      }
+    };
+    setOngoingSessions(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tb_mobile_sessions', JSON.stringify(updated));
+    }
+  };
+
+  const handleStartOrResumeTest = (testId: string) => {
+    const session = ongoingSessions[testId];
+    setActiveTestId(testId);
+    if (session && session.status === 'ONGOING') {
+      setQuestions(session.questions);
+      setCurrentIndex(session.currentIndex);
+      setTimeLeft(session.timeLeft);
+    } else {
+      setQuestions(initialQuestions.map(q => ({ ...q, selectedOption: null, state: q.id === 'q1' ? 2 : 1 })));
+      setCurrentIndex(0);
+      setTimeLeft(1800);
+    }
+    setViewMode('exam');
+  };
+
+  const handlePauseAndExit = () => {
+    if (activeTestId) {
+      saveSession(activeTestId, questions, currentIndex, timeLeft, 'ONGOING');
+    }
+    setViewMode('dashboard');
+    setActiveTestId(null);
+  };
 
   // Timer Tick Hook
   useEffect(() => {
-    if (viewMode !== 'exam') return;
+    if (viewMode !== 'exam' || !activeTestId) return;
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -75,7 +131,27 @@ export default function MobileTestScreen() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [viewMode]);
+  }, [viewMode, activeTestId]);
+
+  // Auto-save on window close or React unmount
+  useEffect(() => {
+    if (viewMode !== 'exam' || !activeTestId) return;
+
+    const handleUnloadSave = () => {
+      saveSession(activeTestId, questions, currentIndex, timeLeft, 'ONGOING');
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleUnloadSave);
+    }
+
+    return () => {
+      handleUnloadSave();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('beforeunload', handleUnloadSave);
+      }
+    };
+  }, [viewMode, activeTestId, questions, currentIndex, timeLeft]);
 
   const activeQuestion = questions[currentIndex];
 
@@ -156,6 +232,10 @@ export default function MobileTestScreen() {
       }
     });
 
+    if (activeTestId) {
+      saveSession(activeTestId, questions, currentIndex, timeLeft, 'COMPLETED');
+    }
+
     Alert.alert(
       'Exam Submitted',
       `Performance Summary:\nCorrect Answers: ${correct}/${questions.length}\nAccuracy: ${((correct / questions.length) * 100).toFixed(1)}%`,
@@ -164,6 +244,7 @@ export default function MobileTestScreen() {
           text: 'Return to Dashboard',
           onPress: () => {
             setViewMode('dashboard');
+            setActiveTestId(null);
             setQuestions(initialQuestions.map(q => ({ ...q, selectedOption: null, state: q.id === 'q1' ? 2 : 1 })));
             setCurrentIndex(0);
             setTimeLeft(1800);
@@ -199,31 +280,43 @@ export default function MobileTestScreen() {
 
           {/* Test Series list */}
           <Text style={styles.sectionHeader}>My Active Enrolled Packages</Text>
-          {mockTestSeries.map((item) => (
-            <View key={item.id} style={styles.testCard}>
-              <View style={styles.cardInfo}>
-                <View style={styles.badgeRow}>
-                  <Text style={styles.tagText}>{item.category}</Text>
-                  {item.isPremium ? (
-                    <Text style={[styles.badge, styles.premiumBadge]}>PRO</Text>
-                  ) : (
-                    <Text style={[styles.badge, styles.freeBadge]}>FREE</Text>
-                  )}
-                </View>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardMeta}>{item.totalTests} Total Tests • Syllabus Tracker Ready</Text>
-              </View>
+          {mockTestSeries.map((item) => {
+            const session = ongoingSessions[item.id];
+            const isOngoing = session && session.status === 'ONGOING';
+            const isCompleted = session && session.status === 'COMPLETED';
 
-              <TouchableOpacity
-                style={styles.cardBtn}
-                onPress={() => {
-                  setViewMode('exam');
-                }}
-              >
-                <Text style={styles.cardBtnText}>Start Test</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            return (
+              <View key={item.id} style={styles.testCard}>
+                <View style={styles.cardInfo}>
+                  <View style={styles.badgeRow}>
+                    <Text style={styles.tagText}>{item.category}</Text>
+                    {item.isPremium ? (
+                      <Text style={[styles.badge, styles.premiumBadge]}>PRO</Text>
+                    ) : (
+                      <Text style={[styles.badge, styles.freeBadge]}>FREE</Text>
+                    )}
+                    {isOngoing && (
+                      <Text style={styles.pausedBadge}>⏸ PAUSED</Text>
+                    )}
+                    {isCompleted && (
+                      <Text style={[styles.badge, styles.freeBadge]}>✓ COMPLETED</Text>
+                    )}
+                  </View>
+                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardMeta}>{item.totalTests} Total Tests • Syllabus Tracker Ready</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={isOngoing ? styles.resumeCardBtn : styles.cardBtn}
+                  onPress={() => handleStartOrResumeTest(item.id)}
+                >
+                  <Text style={styles.cardBtnText}>
+                    {isOngoing ? 'Resume Test' : 'Start Test'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </ScrollView>
       </SafeAreaView>
     );
@@ -235,9 +328,14 @@ export default function MobileTestScreen() {
       <StatusBar barStyle="light-content" />
       {/* Exam Header */}
       <View style={styles.examHeader}>
-        <View>
-          <Text style={styles.examTitle}>SSC CGL Tier 1 CBT</Text>
-          <Text style={styles.examSubTitle}>Question {currentIndex + 1} of {questions.length}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={styles.pauseExitBtn} onPress={handlePauseAndExit}>
+            <Text style={styles.pauseExitBtnText}>⏸ Pause</Text>
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.examTitle}>SSC CGL Tier 1 CBT</Text>
+            <Text style={styles.examSubTitle}>Question {currentIndex + 1} of {questions.length}</Text>
+          </View>
         </View>
         <View style={styles.timerBadge}>
           <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
@@ -758,5 +856,34 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 13,
+  },
+  resumeCardBtn: {
+    backgroundColor: '#EA580C',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  pausedBadge: {
+    backgroundColor: '#FFEDD5',
+    color: '#C2410C',
+    fontSize: 9,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pauseExitBtn: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#3B82F6',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  pauseExitBtnText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 });

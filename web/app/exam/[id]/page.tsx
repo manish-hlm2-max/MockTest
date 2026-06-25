@@ -141,16 +141,55 @@ function TcsIonEngine({ testId }: { testId: string }) {
     resumeExam,
   } = useTestEngine();
 
-  const { addAttempt, currentUser } = useAuth();
+  const { addAttempt, currentUser, saveOngoingSession } = useAuth();
   const router = useRouter();
 
   const [attemptSaved, setAttemptSaved] = useState(false);
 
-  // Initialize session on mount
+  // Initialize session on mount (checking for resume)
   useEffect(() => {
     const examSession = generateExamSession(testId);
-    initSession(examSession, 3); // 3 violations allowed
+    const ongoingRecord = currentUser?.testSessions?.find(
+      s => s.testId === testId && s.status === 'ONGOING'
+    );
+
+    if (ongoingRecord && ongoingRecord.responses) {
+      initSession(examSession, 3, {
+        responses: ongoingRecord.responses as any,
+        timeRemaining: ongoingRecord.timeRemaining ?? examSession.totalDurationSeconds,
+        violationsCount: ongoingRecord.violations ?? 0,
+        currentSectionIndex: ongoingRecord.currentSectionIndex ?? 0,
+        currentQuestionIndex: ongoingRecord.currentQuestionIndex ?? 0,
+      });
+    } else {
+      initSession(examSession, 3); // 3 violations allowed
+    }
   }, [initSession, testId]);
+
+  // Save state on unload/unmount
+  useEffect(() => {
+    const handleSave = () => {
+      // Save only if exam is active and not submitted yet
+      if (state.session && !state.isExamSubmitted) {
+        saveOngoingSession(
+          testId,
+          state.session.testTitle,
+          state.timeRemaining,
+          state.violationsCount,
+          state.responses,
+          state.currentSectionIndex,
+          state.currentQuestionIndex
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', handleSave);
+
+    return () => {
+      handleSave();
+      window.removeEventListener('beforeunload', handleSave);
+    };
+  }, [testId, state.session, state.isExamSubmitted, state.timeRemaining, state.violationsCount, state.responses, saveOngoingSession]);
 
   // Sync attempt score on exam submission
   useEffect(() => {
@@ -833,6 +872,7 @@ function ExamInstructionsScreen({ testId, onStart }: { testId: string; onStart: 
 export default function DynamicExamPage() {
   const params = useParams();
   const testId = (params?.id as string) || "ssc_cgl_tier1";
+  const { saveOngoingSession } = useAuth();
   
   const [isConfirmed, setIsConfirmed] = useState(false);
 
@@ -843,6 +883,17 @@ export default function DynamicExamPage() {
       remaining: engineState.timeRemaining,
       violations: engineState.violationsCount
     });
+    if (engineState.session && !engineState.isExamSubmitted) {
+      saveOngoingSession(
+        testId,
+        engineState.session.testTitle,
+        engineState.timeRemaining,
+        engineState.violationsCount,
+        engineState.responses,
+        engineState.currentSectionIndex,
+        engineState.currentQuestionIndex
+      );
+    }
   };
 
   const handleStart = () => {
