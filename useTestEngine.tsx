@@ -98,7 +98,9 @@ type EngineAction =
   | { type: 'SWITCH_SECTION'; payload: { sectionIndex: number } }
   | { type: 'ADD_VIOLATION' }
   | { type: 'SUBMIT_EXAM' }
-  | { type: 'SET_SYNCING'; payload: boolean };
+  | { type: 'SET_SYNCING'; payload: boolean }
+  | { type: 'PAUSE_EXAM' }
+  | { type: 'RESUME_EXAM' };
 
 // ============================================================================
 // HELPER UTILITIES FOR THE ENGINE
@@ -482,6 +484,20 @@ function engineReducer(state: EngineState, action: EngineAction): EngineState {
       };
     }
 
+    case 'PAUSE_EXAM': {
+      return {
+        ...state,
+        isTimerRunning: false,
+      };
+    }
+
+    case 'RESUME_EXAM': {
+      return {
+        ...state,
+        isTimerRunning: true,
+      };
+    }
+
     default:
       return state;
   }
@@ -503,6 +519,8 @@ interface TestEngineContextType {
   setLanguage: (lang: 'en' | 'hi') => void;
   addViolation: () => void;
   submitExam: () => void;
+  pauseExam: () => void;
+  resumeExam: () => void;
 }
 
 const TestEngineContext = createContext<TestEngineContextType | undefined>(undefined);
@@ -580,6 +598,14 @@ export const TestEngineProvider: React.FC<TestEngineProviderProps> = ({
 
   const submitExam = useCallback(() => {
     dispatch({ type: 'SUBMIT_EXAM' });
+  }, []);
+
+  const pauseExam = useCallback(() => {
+    dispatch({ type: 'PAUSE_EXAM' });
+  }, []);
+
+  const resumeExam = useCallback(() => {
+    dispatch({ type: 'RESUME_EXAM' });
   }, []);
 
   // 1. Timer ticking effect
@@ -695,6 +721,8 @@ export const TestEngineProvider: React.FC<TestEngineProviderProps> = ({
         setLanguage,
         addViolation,
         submitExam,
+        pauseExam,
+        resumeExam,
       }}
     >
       {children}

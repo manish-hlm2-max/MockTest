@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, ArrowLeft, Sun, Moon, Clock } from 'lucide-react';
+import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, ArrowLeft, Sun, Moon, Clock, Pause, Play } from 'lucide-react';
 
 // ============================================================================
 // DYNAMIC EXAM GENERATOR
@@ -137,6 +137,8 @@ function TcsIonEngine({ testId }: { testId: string }) {
     switchSection,
     setLanguage,
     submitExam,
+    pauseExam,
+    resumeExam,
   } = useTestEngine();
 
   const { addAttempt, currentUser } = useAuth();
@@ -230,6 +232,29 @@ function TcsIonEngine({ testId }: { testId: string }) {
 
   const counts = getLegendCounts();
 
+  // Counts for pause statistics
+  const getPauseStats = () => {
+    let attempted = 0;
+    let marked = 0;
+
+    session.questions.forEach((q) => {
+      const resp = responses[q.id];
+      if (resp) {
+        if (resp.state === 3 || resp.state === 5) {
+          attempted++;
+        }
+        if (resp.state === 4 || resp.state === 5) {
+          marked++;
+        }
+      }
+    });
+
+    const remaining = session.questions.length - attempted;
+    return { attempted, remaining, marked };
+  };
+
+  const { attempted: attemptedCount, remaining: remainingCount, marked: markedCount } = getPauseStats();
+
   return (
     <div className="flex h-screen flex-col bg-gray-100 font-sans select-none text-xs leading-normal text-slate-800">
       
@@ -242,14 +267,22 @@ function TcsIonEngine({ testId }: { testId: string }) {
           <span className="font-bold text-sm tracking-wide">{session.testTitle}</span>
         </div>
 
-        {/* Dynamic Countdown Clock */}
-        <div className="flex items-center gap-6">
+        {/* Dynamic Countdown Clock & Pause button */}
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-[#1C3D5A] px-3 py-1.5 rounded border border-[#2E587A]">
             <span className="text-gray-300 text-[10px] uppercase">Time Left:</span>
             <span className="font-mono text-base font-bold text-yellow-400 tracking-wider">
               {formatTime(timeRemaining)}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={pauseExam}
+            className="flex items-center gap-1.5 bg-yellow-600 hover:bg-yellow-750 text-white px-3 py-1.5 rounded border border-yellow-500 font-bold transition active:scale-95 cursor-pointer text-[10px] uppercase tracking-wider"
+          >
+            <Pause className="h-3 w-3" /> Pause
+          </button>
 
           <div className="flex items-center gap-2 border-l border-slate-600 pl-4">
             <Globe className="h-4 w-4 text-slate-400" />
@@ -264,6 +297,49 @@ function TcsIonEngine({ testId }: { testId: string }) {
           </div>
         </div>
       </header>
+
+      {/* PAUSE SCREEN BLUR OVERLAY */}
+      {!state.isTimerRunning && !isExamSubmitted && state.session && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 md:p-8 text-center text-slate-800">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 mb-4 animate-pulse">
+              <Clock className="h-6 w-6" />
+            </div>
+            <h2 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-wide">Exam Paused</h2>
+            <p className="text-slate-500 text-xs mb-6 font-semibold">Your exam timer and questions are hidden. Review your progress summary below to resume.</p>
+
+            <div className="grid grid-cols-2 gap-4 text-left border-y border-slate-200 py-4 mb-6 font-semibold">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Total Questions:</p>
+                <p className="text-sm font-extrabold text-slate-800">{session.questions.length}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Time Left:</p>
+                <p className="text-sm font-extrabold text-yellow-600 font-mono tracking-wider">{formatTime(timeRemaining)}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Attempted Qs:</p>
+                <p className="text-sm font-extrabold text-green-600">{attemptedCount}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Remaining Qs:</p>
+                <p className="text-sm font-extrabold text-red-500">{remainingCount}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 col-span-2">
+                <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Marked for Review Qs:</p>
+                <p className="text-sm font-extrabold text-indigo-600">{markedCount}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={resumeExam}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition cursor-pointer text-xs uppercase tracking-wider"
+            >
+              <Play className="h-4 w-4" /> Resume Test
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* GATING / SUBMITTED SCREEN OVERLAY */}
       {isExamSubmitted ? (
@@ -299,7 +375,23 @@ function TcsIonEngine({ testId }: { testId: string }) {
             </div>
 
             <button
-              onClick={() => router.push('/mock-tests')}
+              onClick={() => {
+                try {
+                  const doc = document as any;
+                  if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                  } else if (doc.mozCancelFullScreen) {
+                    doc.mozCancelFullScreen();
+                  } else if (doc.webkitExitFullscreen) {
+                    doc.webkitExitFullscreen();
+                  } else if (doc.msExitFullscreen) {
+                    doc.msExitFullscreen();
+                  }
+                } catch (e) {
+                  console.warn("Exit fullscreen failed:", e);
+                }
+                router.push('/mock-tests');
+              }}
               className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg shadow hover:bg-blue-750 transition"
             >
               Go to Test Series
@@ -754,21 +846,28 @@ export default function DynamicExamPage() {
   };
 
   const handleStart = () => {
-    try {
-      const docEl = document.documentElement;
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen();
-      } else if ((docEl as any).mozRequestFullScreen) { /* Firefox */
-        (docEl as any).mozRequestFullScreen();
-      } else if ((docEl as any).webkitRequestFullscreen) { /* Chrome, Safari and Opera */
-        (docEl as any).webkitRequestFullscreen();
-      } else if ((docEl as any).msRequestFullscreen) { /* IE/Edge */
-        (docEl as any).msRequestFullscreen();
+    const docEl = document.documentElement;
+    const req = docEl.requestFullscreen || 
+                (docEl as any).mozRequestFullScreen || 
+                (docEl as any).webkitRequestFullscreen || 
+                (docEl as any).msRequestFullscreen;
+    if (req) {
+      const promise = req.call(docEl);
+      if (promise && typeof promise.then === 'function') {
+        promise
+          .then(() => {
+            setIsConfirmed(true);
+          })
+          .catch((err) => {
+            console.warn("Fullscreen promise rejected:", err);
+            setIsConfirmed(true);
+          });
+      } else {
+        setIsConfirmed(true);
       }
-    } catch (e) {
-      console.warn("Fullscreen request failed:", e);
+    } else {
+      setIsConfirmed(true);
     }
-    setIsConfirmed(true);
   };
 
   if (!isConfirmed) {

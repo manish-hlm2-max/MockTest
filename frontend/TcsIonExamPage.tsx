@@ -7,7 +7,7 @@ import {
   ActiveSession,
   Question,
 } from '../useTestEngine';
-import { Check, Info, HelpCircle, ShieldAlert, Monitor, HelpCircle as HelpIcon, Globe, User } from 'lucide-react';
+import { Check, Info, HelpCircle, ShieldAlert, Monitor, HelpCircle as HelpIcon, Globe, User, Clock, Pause, Play } from 'lucide-react';
 
 // ============================================================================
 // MOCK DATA TO POPULATE EXAM (SSC CGL Tier 1 CBT Example)
@@ -166,6 +166,8 @@ const TcsIonEngine: React.FC = () => {
     switchSection,
     setLanguage,
     submitExam,
+    pauseExam,
+    resumeExam,
   } = useTestEngine();
 
   // Initialize session on mount
@@ -227,6 +229,29 @@ const TcsIonEngine: React.FC = () => {
 
   const counts = getLegendCounts();
 
+  // Counts for pause statistics
+  const getPauseStats = () => {
+    let attempted = 0;
+    let marked = 0;
+
+    session.questions.forEach((q) => {
+      const resp = responses[q.id];
+      if (resp) {
+        if (resp.state === 3 || resp.state === 5) {
+          attempted++;
+        }
+        if (resp.state === 4 || resp.state === 5) {
+          marked++;
+        }
+      }
+    });
+
+    const remaining = session.questions.length - attempted;
+    return { attempted, remaining, marked };
+  };
+
+  const { attempted: attemptedCount, remaining: remainingCount, marked: markedCount } = getPauseStats();
+
   return (
     <div className="flex h-screen flex-col bg-gray-100 font-sans select-none text-xs leading-normal text-slate-800">
       
@@ -239,14 +264,22 @@ const TcsIonEngine: React.FC = () => {
           <span className="font-bold text-sm tracking-wide">{session.testTitle}</span>
         </div>
 
-        {/* Dynamic Countdown Clock */}
-        <div className="flex items-center gap-6">
+        {/* Dynamic Countdown Clock & Pause button */}
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-[#1C3D5A] px-3 py-1.5 rounded border border-[#2E587A]">
             <span className="text-gray-300 text-[10px] uppercase">Time Left:</span>
             <span className="font-mono text-base font-bold text-yellow-400 tracking-wider">
               {formatTime(timeRemaining)}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={pauseExam}
+            className="flex items-center gap-1.5 bg-yellow-600 hover:bg-yellow-750 text-white px-3 py-1.5 rounded border border-yellow-500 font-bold transition active:scale-95 cursor-pointer text-[10px] uppercase tracking-wider"
+          >
+            <Pause className="h-3 w-3" /> Pause
+          </button>
 
           <div className="flex items-center gap-2 border-l border-slate-600 pl-4">
             <Globe className="h-4 w-4 text-slate-400" />
@@ -296,7 +329,23 @@ const TcsIonEngine: React.FC = () => {
             </div>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                try {
+                  const doc = document as any;
+                  if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                  } else if (doc.mozCancelFullScreen) {
+                    doc.mozCancelFullScreen();
+                  } else if (doc.webkitExitFullscreen) {
+                    doc.webkitExitFullscreen();
+                  } else if (doc.msExitFullscreen) {
+                    doc.msExitFullscreen();
+                  }
+                } catch (e) {
+                  console.warn("Exit fullscreen failed:", e);
+                }
+                window.location.reload();
+              }}
               className="w-full bg-blue-600 text-white font-bold py-2 rounded shadow hover:bg-blue-700 transition"
             >
               Close Simulator
@@ -305,6 +354,52 @@ const TcsIonEngine: React.FC = () => {
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
+          {/* PAUSE SCREEN BLUR OVERLAY */}
+          {!state.isTimerRunning && !isExamSubmitted && state.session && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+              <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 md:p-8 text-center text-slate-800">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 mb-4 animate-pulse">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <h2 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-wide">Exam Paused</h2>
+                <p className="text-slate-500 text-xs mb-6 font-semibold">Your exam timer and questions are hidden. Review your progress summary below to resume.</p>
+
+                <div className="grid grid-cols-2 gap-4 text-left border-y border-slate-200 py-4 mb-6 font-semibold">
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Total Questions:</p>
+                    <p className="text-sm font-extrabold text-slate-800">{session.questions.length}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Time Left:</p>
+                    <p className="text-sm font-extrabold text-yellow-600 font-mono tracking-wider">{formatTime(timeRemaining)}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Attempted Qs:</p>
+                    <p className="text-sm font-extrabold text-green-600">{attemptedCount}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Remaining Qs:</p>
+                    <p className="text-sm font-extrabold text-red-500">{remainingCount}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 col-span-2">
+                    <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold">Marked for Review Qs:</p>
+                    <p className="text-sm font-extrabold text-indigo-600">{markedCount}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={resumeExam}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-lg shadow-lg hover:shadow-blue-500/20 active:scale-95 transition cursor-pointer text-xs uppercase tracking-wider"
+                >
+                  <Play className="h-4 w-4" /> Resume Test
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================================
+              2. LEFT PANEL (75% WIDTH) - SUBJECTS TABS, QUESTION BLOCK & ACTIONS
+              ================================================================== */}
           
           {/* ==================================================================
               2. LEFT PANEL (75% WIDTH) - SUBJECTS TABS, QUESTION BLOCK & ACTIONS
