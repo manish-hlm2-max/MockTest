@@ -753,8 +753,26 @@ export default function DynamicExamPage() {
     });
   };
 
+  const handleStart = () => {
+    try {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen();
+      } else if ((docEl as any).mozRequestFullScreen) { /* Firefox */
+        (docEl as any).mozRequestFullScreen();
+      } else if ((docEl as any).webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+        (docEl as any).webkitRequestFullscreen();
+      } else if ((docEl as any).msRequestFullscreen) { /* IE/Edge */
+        (docEl as any).msRequestFullscreen();
+      }
+    } catch (e) {
+      console.warn("Fullscreen request failed:", e);
+    }
+    setIsConfirmed(true);
+  };
+
   if (!isConfirmed) {
-    return <ExamInstructionsScreen testId={testId} onStart={() => setIsConfirmed(true)} />;
+    return <ExamInstructionsScreen testId={testId} onStart={handleStart} />;
   }
 
   return (
