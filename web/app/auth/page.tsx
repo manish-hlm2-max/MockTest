@@ -37,7 +37,7 @@ export default function AuthPage() {
           router.push('/');
         }, 1500);
       } else {
-        setErrorMsg(t.authLoginFail || 'Invalid credentials. Use rahul.sharma@example.com or sign up.');
+        setErrorMsg(t.authLoginFail || 'Invalid credentials. Please register or sign up.');
       }
     } else {
       if (!name.trim()) {
@@ -260,13 +260,11 @@ export default function AuthPage() {
           </form>
 
           {/* Quick instructions */}
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 text-center border-t border-slate-200 dark:border-slate-800/80 pt-4 mt-6">
-            {activeTab === 'login' ? (
-              <p>{language === 'hi' ? 'डेमो लॉगिन' : 'Demo Login'}: <strong className="text-slate-700 dark:text-slate-300">rahul.sharma@example.com</strong></p>
-            ) : (
+          {activeTab === 'signup' && (
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 text-center border-t border-slate-200 dark:border-slate-800/80 pt-4 mt-6">
               <p>{language === 'hi' ? 'पूर्ण मॉक टेस्ट इतिहास ट्रैकिंग के साथ एक नया सत्र प्रोफ़ाइल बनाने के लिए साइन अप करें।' : 'Sign up to create a new session profile with full mock test history tracking.'}</p>
-            )}
-          </div>
+            </div>
+          )}
 
         </div>
 
