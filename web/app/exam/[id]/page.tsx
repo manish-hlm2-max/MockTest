@@ -8,7 +8,7 @@ import {
   Question,
   EngineState
 } from '../../useTestEngine';
-import { useAuth } from '../../AuthContext';
+import { useAuth, TestCategory, MockTestItem } from '../../AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, ArrowLeft, Sun, Moon, Clock, Pause, Play } from 'lucide-react';
@@ -16,9 +16,28 @@ import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, Ar
 // ============================================================================
 // DYNAMIC EXAM GENERATOR
 // ============================================================================
-export const generateExamSession = (id: string): ActiveSession => {
+export const generateExamSession = (id: string, examCatalog?: TestCategory[]): ActiveSession => {
   let title = "Government Prep Mock Test Simulator";
   let duration = 3600; // 60 mins
+  let catalogTest: MockTestItem | null = null;
+
+  if (examCatalog) {
+    for (const cat of examCatalog) {
+      for (const sub of cat.subCategories) {
+        const found = sub.tests.find(t => t.id === id);
+        if (found) {
+          catalogTest = found;
+          break;
+        }
+      }
+      if (catalogTest) break;
+    }
+  }
+
+  if (catalogTest) {
+    title = catalogTest.title;
+    duration = catalogTest.durationMinutes * 60;
+  }
   let sections = [
     { id: "sec_gs", name: "General Studies", orderIndex: 0, positiveMark: 2, negativeMark: 0.5 },
     { id: "sec_quant", name: "Quantitative Aptitude", orderIndex: 1, positiveMark: 2, negativeMark: 0.5 }
@@ -141,7 +160,7 @@ function TcsIonEngine({ testId }: { testId: string }) {
     resumeExam,
   } = useTestEngine();
 
-  const { addAttempt, currentUser, saveOngoingSession, language: authLanguage } = useAuth();
+  const { addAttempt, currentUser, saveOngoingSession, language: authLanguage, examCatalog } = useAuth();
   const router = useRouter();
 
   const [attemptSaved, setAttemptSaved] = useState(false);
@@ -154,7 +173,7 @@ function TcsIonEngine({ testId }: { testId: string }) {
 
   // Initialize session on mount (checking for resume)
   useEffect(() => {
-    const examSession = generateExamSession(testId);
+    const examSession = generateExamSession(testId, examCatalog);
     const ongoingRecord = currentUser?.testSessions?.find(
       s => s.testId === testId && s.status === 'ONGOING'
     );
@@ -170,7 +189,7 @@ function TcsIonEngine({ testId }: { testId: string }) {
     } else {
       initSession(examSession, 3, undefined, authLanguage); // 3 violations allowed
     }
-  }, [initSession, testId, authLanguage]);
+  }, [initSession, testId, authLanguage, examCatalog]);
 
   // Save state on unload/unmount
   useEffect(() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useAuth } from '../AuthContext';
+import { useAuth, TestCategory, TestSubCategory, MockTestItem } from '../AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BookOpen, ShieldAlert, Award, ArrowLeft, Search, GraduationCap, ChevronRight, Check, Sun, Moon, Bookmark, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
@@ -9,160 +9,8 @@ import { generateExamSession } from '../exam/[id]/page';
 import { EXPLANATIONS } from '../exam/[id]/analysis/page';
 import { TRANSLATIONS } from '../translations';
 
-interface MockTestItem {
-  id: string;
-  title: string;
-  questionsCount: number;
-  durationMinutes: number;
-  maxMarks: number;
-  isPremium: boolean;
-  requiredTier: 'None' | 'Testbook Pass' | 'Testbook Pass Pro';
-}
-
-interface TestSubCategory {
-  id: string;
-  name: string;
-  tests: MockTestItem[];
-}
-
-interface TestCategory {
-  id: string;
-  name: string;
-  subCategories: TestSubCategory[];
-}
-
-const EXAM_CATALOG: TestCategory[] = [
-  {
-    id: 'ssc',
-    name: 'SSC Exams',
-    subCategories: [
-      {
-        id: 'ssc_cgl',
-        name: 'SSC CGL Exams',
-        tests: [
-          { id: 'ssc_cgl_tier1', title: 'SSC CGL 2026 - Combined Graduate Level (Tier-I) Exam', questionsCount: 100, durationMinutes: 60, maxMarks: 200, isPremium: false, requiredTier: 'None' }
-        ]
-      },
-      {
-        id: 'ssc_chsl',
-        name: 'SSC CHSL Exams',
-        tests: [
-          { id: 'ssc_chsl_tier1', title: 'SSC CHSL 2026 - Combined Higher Secondary Level Test', questionsCount: 100, durationMinutes: 60, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass' }
-        ]
-      },
-      {
-        id: 'ssc_mts',
-        name: 'SSC MTS Exams',
-        tests: [
-          { id: 'ssc_mts_mock', title: 'SSC MTS Full-Length Practice Test Paper', questionsCount: 90, durationMinutes: 90, maxMarks: 270, isPremium: true, requiredTier: 'Testbook Pass' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'railways',
-    name: 'Railways Exams',
-    subCategories: [
-      {
-        id: 'rrb_ntpc',
-        name: 'RRB NTPC Exams',
-        tests: [
-          { id: 'rrb_ntpc_stage1', title: 'RRB NTPC CBT-1 Stage 1 Practice Simulator', questionsCount: 100, durationMinutes: 90, maxMarks: 100, isPremium: false, requiredTier: 'None' }
-        ]
-      },
-      {
-        id: 'rrb_group_d',
-        name: 'RRB Group D Exams',
-        tests: [
-          { id: 'rrb_group_d', title: 'RRB Group D Full Length Mock Test', questionsCount: 100, durationMinutes: 90, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'ugc_net',
-    name: 'UGC NET Exams',
-    subCategories: [
-      {
-        id: 'ugc_net_p1',
-        name: 'UGC NET Paper 1',
-        tests: [
-          { id: 'ugc_net_paper1', title: 'UGC NET Paper-1 Teaching & Research Aptitude', questionsCount: 50, durationMinutes: 60, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass Pro' }
-        ]
-      },
-      {
-        id: 'ugc_net_cs',
-        name: 'UGC NET Computer Science',
-        tests: [
-          { id: 'ugc_net_cs', title: 'UGC NET Computer Science & Applications Paper-II', questionsCount: 100, durationMinutes: 120, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass Pro' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'teaching',
-    name: 'Teaching Exams',
-    subCategories: [
-      {
-        id: 'ctet_p1',
-        name: 'CTET Paper 1 Exams',
-        tests: [
-          { id: 'ctet_paper1', title: 'CTET 2026 Paper-I (Primary Class I-V) Mock Paper', questionsCount: 150, durationMinutes: 150, maxMarks: 150, isPremium: false, requiredTier: 'None' }
-        ]
-      },
-      {
-        id: 'ctet_p2',
-        name: 'CTET Paper 2 Exams',
-        tests: [
-          { id: 'ctet_paper2', title: 'CTET 2026 Paper-II (Mathematics & Science)', questionsCount: 150, durationMinutes: 150, maxMarks: 150, isPremium: true, requiredTier: 'Testbook Pass' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'state_exams',
-    name: 'All State Exams',
-    subCategories: [
-      {
-        id: 'uppsc',
-        name: 'UPPSC Exams',
-        tests: [
-          { id: 'up_psc_prelims', title: 'UPPSC Prelims General Studies (GS Paper 1)', questionsCount: 150, durationMinutes: 120, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass Pro' }
-        ]
-      },
-      {
-        id: 'bssc',
-        name: 'BSSC Exams',
-        tests: [
-          { id: 'bihar_ssc', title: 'BSSC Inter-Level Full Practice Mock Paper', questionsCount: 150, durationMinutes: 135, maxMarks: 600, isPremium: true, requiredTier: 'Testbook Pass' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'banking',
-    name: 'Banking Exams',
-    subCategories: [
-      {
-        id: 'sbi_po',
-        name: 'SBI PO Exams',
-        tests: [
-          { id: 'sbi_po_prelims', title: 'SBI PO Preliminary Exam Full Length Mock Test', questionsCount: 100, durationMinutes: 60, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass Pro' }
-        ]
-      },
-      {
-        id: 'ibps_clerk',
-        name: 'IBPS Clerk Exams',
-        tests: [
-          { id: 'ibps_clerk', title: 'IBPS Clerk Preliminary Practice Mock Paper', questionsCount: 100, durationMinutes: 60, maxMarks: 100, isPremium: false, requiredTier: 'None' }
-        ]
-      }
-    ]
-  }
-];
-
 export default function MockTestsCatalog() {
-  const { currentUser, saveUserProfileByAdmin, theme, toggleTheme, toggleBookmark, clearOngoingSession, language, setLanguage } = useAuth();
+  const { currentUser, saveUserProfileByAdmin, theme, toggleTheme, toggleBookmark, clearOngoingSession, language, setLanguage, examCatalog } = useAuth();
   const router = useRouter();
   const t = TRANSLATIONS[language];
   
@@ -170,9 +18,7 @@ export default function MockTestsCatalog() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const cat = params.get('cat');
-      if (cat && ['ssc', 'railways', 'ugc_net', 'teaching', 'state_exams', 'banking'].includes(cat)) {
-        return cat;
-      }
+      return cat || 'ssc';
     }
     return 'ssc';
   });
@@ -183,7 +29,7 @@ export default function MockTestsCatalog() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const cat = params.get('cat');
-      if (cat && ['ssc', 'railways', 'ugc_net', 'teaching', 'state_exams', 'banking'].includes(cat)) {
+      if (cat) {
         setSelectedCategory(cat);
       }
     }
@@ -203,7 +49,7 @@ export default function MockTestsCatalog() {
     }));
   };
 
-  const currentCategoryObj = EXAM_CATALOG.find(c => c.id === selectedCategory);
+  const currentCategoryObj = examCatalog.find(c => c.id === selectedCategory);
   
   const handleStartExam = (test: MockTestItem) => {
     if (!currentUser) {
@@ -355,7 +201,7 @@ export default function MockTestsCatalog() {
             <h3 className="font-extrabold text-[10px] text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-4 font-sans">{t.examCategories}</h3>
             
             <nav className="space-y-1">
-              {EXAM_CATALOG.map((category) => (
+              {examCatalog.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => {
@@ -414,7 +260,7 @@ export default function MockTestsCatalog() {
               ) : (
                 <div className="space-y-4 max-w-4xl">
                   {currentUser.bookmarkedQuestions.map((bm, index) => {
-                    const exam = generateExamSession(bm.testId);
+                    const exam = generateExamSession(bm.testId, examCatalog);
                     const question = exam.questions.find(q => q.id === bm.questionId);
                     if (!question) return null;
 

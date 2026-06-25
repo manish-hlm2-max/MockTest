@@ -2,6 +2,28 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+export interface MockTestItem {
+  id: string;
+  title: string;
+  questionsCount: number;
+  durationMinutes: number;
+  maxMarks: number;
+  isPremium: boolean;
+  requiredTier: 'None' | 'Testbook Pass' | 'Testbook Pass Pro';
+}
+
+export interface TestSubCategory {
+  id: string;
+  name: string;
+  tests: MockTestItem[];
+}
+
+export interface TestCategory {
+  id: string;
+  name: string;
+  subCategories: TestSubCategory[];
+}
+
 export interface MockTestRecord {
   id: string;
   testId?: string;
@@ -98,9 +120,146 @@ interface AuthContextType {
   deleteNotice: (id: string) => void;
   language: 'en' | 'hi';
   setLanguage: (lang: 'en' | 'hi') => void;
+  examCatalog: TestCategory[];
+  addCategory: (name: string) => void;
+  deleteCategory: (categoryId: string) => void;
+  addSubCategory: (categoryId: string, name: string) => void;
+  deleteSubCategory: (categoryId: string, subCategoryId: string) => void;
+  addMockTest: (categoryId: string, subCategoryId: string, test: Omit<MockTestItem, 'id'>) => void;
+  deleteMockTest: (categoryId: string, subCategoryId: string, testId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const DEFAULT_EXAM_CATALOG: TestCategory[] = [
+  {
+    id: 'ssc',
+    name: 'SSC Exams',
+    subCategories: [
+      {
+        id: 'ssc_cgl',
+        name: 'SSC CGL Exams',
+        tests: [
+          { id: 'ssc_cgl_tier1', title: 'SSC CGL 2026 - Combined Graduate Level (Tier-I) Exam', questionsCount: 100, durationMinutes: 60, maxMarks: 200, isPremium: false, requiredTier: 'None' }
+        ]
+      },
+      {
+        id: 'ssc_chsl',
+        name: 'SSC CHSL Exams',
+        tests: [
+          { id: 'ssc_chsl_tier1', title: 'SSC CHSL 2026 - Combined Higher Secondary Level Test', questionsCount: 100, durationMinutes: 60, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass' }
+        ]
+      },
+      {
+        id: 'ssc_mts',
+        name: 'SSC MTS Exams',
+        tests: [
+          { id: 'ssc_mts_mock', title: 'SSC MTS Full-Length Practice Test Paper', questionsCount: 90, durationMinutes: 90, maxMarks: 270, isPremium: true, requiredTier: 'Testbook Pass' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'railways',
+    name: 'Railways Exams',
+    subCategories: [
+      {
+        id: 'rrb_ntpc',
+        name: 'RRB NTPC Exams',
+        tests: [
+          { id: 'rrb_ntpc_stage1', title: 'RRB NTPC CBT-1 Stage 1 Practice Simulator', questionsCount: 100, durationMinutes: 90, maxMarks: 100, isPremium: false, requiredTier: 'None' }
+        ]
+      },
+      {
+        id: 'rrb_group_d',
+        name: 'RRB Group D Exams',
+        tests: [
+          { id: 'rrb_group_d', title: 'RRB Group D Full Length Mock Test', questionsCount: 100, durationMinutes: 90, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'ugc_net',
+    name: 'UGC NET Exams',
+    subCategories: [
+      {
+        id: 'ugc_net_p1',
+        name: 'UGC NET Paper 1',
+        tests: [
+          { id: 'ugc_net_paper1', title: 'UGC NET Paper-1 Teaching & Research Aptitude', questionsCount: 50, durationMinutes: 60, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass Pro' }
+        ]
+      },
+      {
+        id: 'ugc_net_cs',
+        name: 'UGC NET Computer Science',
+        tests: [
+          { id: 'ugc_net_cs', title: 'UGC NET Computer Science & Applications Paper-II', questionsCount: 100, durationMinutes: 120, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass Pro' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'teaching',
+    name: 'Teaching Exams',
+    subCategories: [
+      {
+        id: 'ctet_p1',
+        name: 'CTET Paper 1 Exams',
+        tests: [
+          { id: 'ctet_paper1', title: 'CTET 2026 Paper-I (Primary Class I-V) Mock Paper', questionsCount: 150, durationMinutes: 150, maxMarks: 150, isPremium: false, requiredTier: 'None' }
+        ]
+      },
+      {
+        id: 'ctet_p2',
+        name: 'CTET Paper 2 Exams',
+        tests: [
+          { id: 'ctet_paper2', title: 'CTET 2026 Paper-II (Mathematics & Science)', questionsCount: 150, durationMinutes: 150, maxMarks: 150, isPremium: true, requiredTier: 'Testbook Pass' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'state_exams',
+    name: 'All State Exams',
+    subCategories: [
+      {
+        id: 'uppsc',
+        name: 'UPPSC Exams',
+        tests: [
+          { id: 'up_psc_prelims', title: 'UPPSC Prelims General Studies (GS Paper 1)', questionsCount: 150, durationMinutes: 120, maxMarks: 200, isPremium: true, requiredTier: 'Testbook Pass Pro' }
+        ]
+      },
+      {
+        id: 'bssc',
+        name: 'BSSC Exams',
+        tests: [
+          { id: 'bihar_ssc', title: 'BSSC Inter-Level Full Practice Mock Paper', questionsCount: 150, durationMinutes: 135, maxMarks: 600, isPremium: true, requiredTier: 'Testbook Pass' }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'banking',
+    name: 'Banking Exams',
+    subCategories: [
+      {
+        id: 'sbi_po',
+        name: 'SBI PO Exams',
+        tests: [
+          { id: 'sbi_po_prelims', title: 'SBI PO Preliminary Exam Full Length Mock Test', questionsCount: 100, durationMinutes: 60, maxMarks: 100, isPremium: true, requiredTier: 'Testbook Pass Pro' }
+        ]
+      },
+      {
+        id: 'ibps_clerk',
+        name: 'IBPS Clerk Exams',
+        tests: [
+          { id: 'ibps_clerk', title: 'IBPS Clerk Preliminary Practice Mock Paper', questionsCount: 100, durationMinutes: 60, maxMarks: 100, isPremium: false, requiredTier: 'None' }
+        ]
+      }
+    ]
+  }
+];
 
 const INITIAL_USERS: MockUser[] = [
   {
@@ -196,6 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [noticesList, setNoticesList] = useState<Notice[]>([]);
   const [language, setLanguageState] = useState<'en' | 'hi'>('en');
+  const [examCatalog, setExamCatalog] = useState<TestCategory[]>([]);
 
   // Load initial data from localStorage with backfill checks
   useEffect(() => {
@@ -302,6 +462,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('tb_notices', JSON.stringify(DEFAULT_NOTICES));
     }
     setNoticesList(loadedNotices);
+
+    // Load exam catalog setting
+    const savedCatalog = localStorage.getItem('tb_exam_catalog');
+    let loadedCatalog: TestCategory[] = [];
+    if (savedCatalog) {
+      try {
+        loadedCatalog = JSON.parse(savedCatalog) as TestCategory[];
+      } catch (e) {
+        loadedCatalog = DEFAULT_EXAM_CATALOG;
+        localStorage.setItem('tb_exam_catalog', JSON.stringify(DEFAULT_EXAM_CATALOG));
+      }
+    } else {
+      loadedCatalog = DEFAULT_EXAM_CATALOG;
+      localStorage.setItem('tb_exam_catalog', JSON.stringify(DEFAULT_EXAM_CATALOG));
+    }
+    setExamCatalog(loadedCatalog);
   }, []);
 
   // Sync theme changes with DOM node class selectors
@@ -371,6 +547,107 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = noticesList.filter(n => n.id !== id);
     setNoticesList(updated);
     localStorage.setItem('tb_notices', JSON.stringify(updated));
+  };
+
+  const addCategory = (name: string) => {
+    const newId = name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substring(2, 6);
+    const newCategory: TestCategory = {
+      id: newId,
+      name,
+      subCategories: []
+    };
+    const updated = [...examCatalog, newCategory];
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
+  };
+
+  const deleteCategory = (categoryId: string) => {
+    const updated = examCatalog.filter(c => c.id !== categoryId);
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
+  };
+
+  const addSubCategory = (categoryId: string, name: string) => {
+    const newId = name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substring(2, 6);
+    const newSub: TestSubCategory = {
+      id: newId,
+      name,
+      tests: []
+    };
+    const updated = examCatalog.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: [...c.subCategories, newSub]
+        };
+      }
+      return c;
+    });
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
+  };
+
+  const deleteSubCategory = (categoryId: string, subCategoryId: string) => {
+    const updated = examCatalog.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: c.subCategories.filter(s => s.id !== subCategoryId)
+        };
+      }
+      return c;
+    });
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
+  };
+
+  const addMockTest = (categoryId: string, subCategoryId: string, test: Omit<MockTestItem, 'id'>) => {
+    const newId = test.title.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substring(2, 6);
+    const newTest: MockTestItem = {
+      ...test,
+      id: newId
+    };
+    const updated = examCatalog.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: c.subCategories.map(s => {
+            if (s.id === subCategoryId) {
+              return {
+                ...s,
+                tests: [...s.tests, newTest]
+              };
+            }
+            return s;
+          })
+        };
+      }
+      return c;
+    });
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
+  };
+
+  const deleteMockTest = (categoryId: string, subCategoryId: string, testId: string) => {
+    const updated = examCatalog.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          subCategories: c.subCategories.map(s => {
+            if (s.id === subCategoryId) {
+              return {
+                ...s,
+                tests: s.tests.filter(t => t.id !== testId)
+              };
+            }
+            return s;
+          })
+        };
+      }
+      return c;
+    });
+    setExamCatalog(updated);
+    localStorage.setItem('tb_exam_catalog', JSON.stringify(updated));
   };
 
   const setLanguage = (lang: 'en' | 'hi') => {
@@ -671,7 +948,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteNotice,
         language,
         setLanguage,
-        saveUserProfileByAdmin
+        saveUserProfileByAdmin,
+        examCatalog,
+        addCategory,
+        deleteCategory,
+        addSubCategory,
+        deleteSubCategory,
+        addMockTest,
+        deleteMockTest
       }}
     >
       {children}
