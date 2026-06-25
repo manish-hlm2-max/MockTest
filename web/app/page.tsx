@@ -117,6 +117,7 @@ export default function HomeLandingPage() {
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-500 dark:text-slate-400">
             <Link href="/mock-tests" className="hover:text-blue-600 dark:hover:text-white transition-colors">Test Series</Link>
+            <Link href="/updates" className="hover:text-blue-600 dark:hover:text-white transition-colors">Notices & Announcements</Link>
             <Link href="/profile" className="hover:text-blue-600 dark:hover:text-white transition-colors">My Profile</Link>
             <Link href="/admin" className="hover:text-blue-600 dark:hover:text-white transition-colors">Admin Panel</Link>
           </nav>
@@ -297,13 +298,13 @@ export default function HomeLandingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Tile 1: Live Notices & Announcements */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[380px]">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[646px]">
             <div>
               <h3 className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                 <Bell className="h-4.5 w-4.5 text-blue-600 animate-bounce" /> Live Notices & Announcements
               </h3>
               
-              <div className="space-y-3 overflow-y-auto max-h-[260px] pr-1 scrollbar-thin">
+              <div className="space-y-3 overflow-y-auto max-h-[442px] pr-1 scrollbar-thin">
                 {noticesList.filter(n => n.category === 'notice').length > 0 ? (
                   noticesList.filter(n => n.category === 'notice').map(notice => (
                     <div
@@ -356,13 +357,13 @@ export default function HomeLandingPage() {
           </div>
 
           {/* Tile 2: Live Result Section */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[380px]">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[646px]">
             <div>
               <h3 className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                 <Trophy className="h-4.5 w-4.5 text-yellow-500 animate-pulse" /> Live Result Section
               </h3>
               
-              <div className="space-y-3 overflow-y-auto max-h-[260px] pr-1 scrollbar-thin">
+              <div className="space-y-3 overflow-y-auto max-h-[442px] pr-1 scrollbar-thin">
                 {noticesList.filter(n => n.category === 'result').length > 0 ? (
                   noticesList.filter(n => n.category === 'result').map(notice => (
                     <div
@@ -415,13 +416,13 @@ export default function HomeLandingPage() {
           </div>
 
           {/* Tile 3: Live Admit Card Section */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[380px]">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-sm flex flex-col justify-between min-h-[646px]">
             <div>
               <h3 className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText className="h-4.5 w-4.5 text-green-550" /> Live Admit Card Section
               </h3>
               
-              <div className="space-y-3 overflow-y-auto max-h-[260px] pr-1 scrollbar-thin">
+              <div className="space-y-3 overflow-y-auto max-h-[442px] pr-1 scrollbar-thin">
                 {noticesList.filter(n => n.category === 'admit_card').length > 0 ? (
                   noticesList.filter(n => n.category === 'admit_card').map(notice => (
                     <div

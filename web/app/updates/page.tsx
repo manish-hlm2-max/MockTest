@@ -48,6 +48,7 @@ export default function UpdatesCenterPage() {
           <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-500 dark:text-slate-400">
             <Link href="/" className="hover:text-blue-600 dark:hover:text-white transition-colors">Home</Link>
             <Link href="/mock-tests" className="hover:text-blue-600 dark:hover:text-white transition-colors">Test Series</Link>
+            <Link href="/updates" className="hover:text-blue-600 dark:hover:text-white transition-colors">Notices & Announcements</Link>
             <Link href="/profile" className="hover:text-blue-600 dark:hover:text-white transition-colors">My Profile</Link>
             <Link href="/admin" className="hover:text-blue-600 dark:hover:text-white transition-colors">Admin Panel</Link>
           </nav>
