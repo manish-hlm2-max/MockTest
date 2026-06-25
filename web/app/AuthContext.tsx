@@ -13,6 +13,7 @@ export interface MockTestRecord {
   status: 'COMPLETED' | 'AUTO_SUBMITTED' | 'ONGOING';
   violations: number;
   date: string;
+  responses?: Record<string, { selectedOptionIndex: number | null; elapsedSeconds: number; }>;
 }
 
 export interface MockUser {
@@ -30,6 +31,7 @@ export interface MockUser {
   subscriptionExpiresAt: string | null;
   registeredDate: string;
   testSessions: MockTestRecord[];
+  bookmarkedQuestions?: { testId: string; questionId: string; }[];
 }
 
 interface AuthContextType {
@@ -42,7 +44,17 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (name: string, email: string, mobile: string) => void;
   updatePassword: (oldPass: string, newPass: string) => boolean;
-  addAttempt: (testId: string, title: string, score: number, maxScore: number, accuracy: number, durationSeconds: number, violations: number) => void;
+  addAttempt: (
+    testId: string,
+    title: string,
+    score: number,
+    maxScore: number,
+    accuracy: number,
+    durationSeconds: number,
+    violations: number,
+    responses?: Record<string, { selectedOptionIndex: number | null; elapsedSeconds: number; }>
+  ) => void;
+  toggleBookmark: (testId: string, questionId: string) => void;
   resetAttempt: (userId: string, sessionId: string) => void;
   saveUserProfileByAdmin: (
     userId: string,
@@ -334,7 +346,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     maxScore: number,
     accuracy: number,
     durationSeconds: number,
-    violations: number
+    violations: number,
+    responses?: Record<string, { selectedOptionIndex: number | null; elapsedSeconds: number; }>
   ) => {
     if (!currentUser) return;
 
@@ -348,7 +361,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       durationSeconds,
       status: 'COMPLETED',
       violations,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      responses
     };
 
     const updatedSessions = [newRecord, ...currentUser.testSessions];
@@ -356,6 +370,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(updatedUser);
     localStorage.setItem('tb_session', JSON.stringify(updatedUser));
 
+    const updatedList = usersList.map(u => u.id === currentUser.id ? updatedUser : u);
+    setUsersList(updatedList);
+    localStorage.setItem('tb_users', JSON.stringify(updatedList));
+  };
+
+  const toggleBookmark = (testId: string, questionId: string) => {
+    if (!currentUser) return;
+    const currentBookmarks = currentUser.bookmarkedQuestions || [];
+    const exists = currentBookmarks.some(b => b.testId === testId && b.questionId === questionId);
+    
+    let updatedBookmarks;
+    if (exists) {
+      updatedBookmarks = currentBookmarks.filter(b => !(b.testId === testId && b.questionId === questionId));
+    } else {
+      updatedBookmarks = [...currentBookmarks, { testId, questionId }];
+    }
+    
+    const updatedUser = { ...currentUser, bookmarkedQuestions: updatedBookmarks };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('tb_session', JSON.stringify(updatedUser));
+    
     const updatedList = usersList.map(u => u.id === currentUser.id ? updatedUser : u);
     setUsersList(updatedList);
     localStorage.setItem('tb_users', JSON.stringify(updatedList));
@@ -436,6 +471,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfile,
         updatePassword,
         addAttempt,
+        toggleBookmark,
         resetAttempt,
         saveUserProfileByAdmin
       }}

@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../AuthContext';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, ArrowLeft, Sun, Moon } from 'lucide-react';
+import { Check, ShieldAlert, ShieldCheck, Globe, User, BookOpen, AlertCircle, ArrowLeft, Sun, Moon, Clock } from 'lucide-react';
 
 // ============================================================================
 // DYNAMIC EXAM GENERATOR
@@ -154,6 +154,15 @@ function TcsIonEngine({ testId }: { testId: string }) {
   useEffect(() => {
     if (state.isExamSubmitted && state.score && currentUser && !attemptSaved) {
       setAttemptSaved(true);
+      
+      const savedResponses: Record<string, { selectedOptionIndex: number | null; elapsedSeconds: number }> = {};
+      Object.keys(state.responses).forEach(qId => {
+        savedResponses[qId] = {
+          selectedOptionIndex: state.responses[qId].selectedOptionIndex,
+          elapsedSeconds: state.responses[qId].elapsedSeconds
+        };
+      });
+
       addAttempt(
         testId,
         state.session?.testTitle || "Mock Test Attempt",
@@ -161,10 +170,11 @@ function TcsIonEngine({ testId }: { testId: string }) {
         state.score.totalMarks,
         state.score.accuracyPercentage,
         state.session ? state.session.totalDurationSeconds - state.timeRemaining : 0,
-        state.violationsCount
+        state.violationsCount,
+        savedResponses
       );
     }
-  }, [state.isExamSubmitted, state.score, currentUser, addAttempt, testId, attemptSaved]);
+  }, [state.isExamSubmitted, state.score, currentUser, addAttempt, testId, attemptSaved, state.responses, state.session, state.timeRemaining, state.violationsCount]);
 
   if (!state.session) {
     return (
@@ -341,8 +351,15 @@ function TcsIonEngine({ testId }: { testId: string }) {
                     <h3 className="text-sm font-bold text-slate-800">
                       Question No. {currentQuestionIndex + 1}
                     </h3>
-                    <div className="text-[10px] text-slate-400">
-                      ID: {currentQuestion.id}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-[10px] px-2 py-0.5 rounded-md">
+                        <Clock className="h-3 w-3 text-slate-500" />
+                        Time Spent: {Math.floor((activeResponse?.elapsedSeconds || 0) / 60)}:
+                        {String((activeResponse?.elapsedSeconds || 0) % 60).padStart(2, '0')}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        ID: {currentQuestion.id}
+                      </div>
                     </div>
                   </div>
 

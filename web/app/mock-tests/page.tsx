@@ -4,7 +4,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, ShieldAlert, Award, ArrowLeft, Search, GraduationCap, ChevronRight, Check, Sun, Moon } from 'lucide-react';
+import { BookOpen, ShieldAlert, Award, ArrowLeft, Search, GraduationCap, ChevronRight, Check, Sun, Moon, Bookmark, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { generateExamSession } from '../exam/[id]/page';
+import { EXPLANATIONS } from '../exam/[id]/analysis/page';
 
 interface MockTestItem {
   id: string;
@@ -75,13 +77,23 @@ const EXAM_CATALOG: TestCategory[] = [
 ];
 
 export default function MockTestsCatalog() {
-  const { currentUser, saveUserProfileByAdmin, theme, toggleTheme } = useAuth();
+  const { currentUser, saveUserProfileByAdmin, theme, toggleTheme, toggleBookmark } = useAuth();
   const router = useRouter();
   
   const [selectedCategory, setSelectedCategory] = useState<string>('ssc');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [requiredTierInfo, setRequiredTierInfo] = useState<string>('');
+
+  const [showBookmarks, setShowBookmarks] = useState<boolean>(false);
+  const [expandedBookmarks, setExpandedBookmarks] = useState<Record<string, boolean>>({});
+
+  const toggleExpandBookmark = (qId: string) => {
+    setExpandedBookmarks(prev => ({
+      ...prev,
+      [qId]: !prev[qId]
+    }));
+  };
 
   const currentCategoryObj = EXAM_CATALOG.find(c => c.id === selectedCategory);
   
@@ -148,7 +160,26 @@ export default function MockTestsCatalog() {
           <ArrowLeft className="h-4 w-4" /> Back to Home
         </Link>
 
-        <div className="flex items-center gap-4 max-w-sm w-full justify-end">
+        <div className="flex items-center gap-3 max-w-md w-full justify-end">
+          {/* Bookmarked Questions Button */}
+          <button
+            onClick={() => setShowBookmarks(!showBookmarks)}
+            className={`p-2 rounded-xl flex items-center justify-center gap-1.5 border px-3 py-2 text-xs font-bold transition-all active:scale-95 cursor-pointer select-none h-8.5 ${
+              showBookmarks 
+                ? 'bg-yellow-500 border-yellow-500 text-white shadow-md shadow-yellow-500/20'
+                : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-800'
+            }`}
+            title="Bookmarked Questions"
+          >
+            <Bookmark className={`h-3.5 w-3.5 ${showBookmarks ? 'fill-white' : ''}`} />
+            <span className="hidden sm:inline">Bookmarks</span>
+            {currentUser?.bookmarkedQuestions?.length ? (
+              <span className="bg-red-500 text-white rounded-full text-[9px] px-1.5 py-0.5">
+                {currentUser.bookmarkedQuestions.length}
+              </span>
+            ) : null}
+          </button>
+
           {/* Search filter */}
           <div className="relative max-w-xs w-full">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
@@ -183,12 +214,15 @@ export default function MockTestsCatalog() {
             <h3 className="font-extrabold text-[10px] text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-4 font-sans">Exam Categories</h3>
             
             <nav className="space-y-1">
-              {EXAM_CATALOG.map(category => (
+              {EXAM_CATALOG.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
+                  onClick={() => {
+                    setSelectedCategory(category.id);
+                    setShowBookmarks(false);
+                  }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
-                    selectedCategory === category.id
+                    selectedCategory === category.id && !showBookmarks
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
                   }`}
@@ -217,100 +251,233 @@ export default function MockTestsCatalog() {
 
         {/* Right Side Content (Tests display) */}
         <main className="flex-1 p-8 overflow-y-auto">
-          
-          <div className="mb-6">
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-blue-500" />
-              {currentCategoryObj?.name} Test Series
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Simulate real examination CBT patterns. Select any card below to begin sitting.</p>
-          </div>
+          {showBookmarks ? (
+            <div>
+              {/* Bookmarked Questions Header */}
+              <div className="mb-6">
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Bookmark className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                  Bookmarked Questions
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Review your bookmarked questions and their step-by-step solutions below.</p>
+              </div>
 
-          {/* Test cards list grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentCategoryObj?.tests
-              .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map(test => {
-                const hasPass = currentUser && (
-                  (test.requiredTier === 'None') ||
-                  (test.requiredTier === 'Testbook Pass' && (currentUser.subscriptionTier === 'Testbook Pass' || currentUser.subscriptionTier === 'Testbook Pass Pro')) ||
-                  (test.requiredTier === 'Testbook Pass Pro' && currentUser.subscriptionTier === 'Testbook Pass Pro')
-                );
+              {/* Bookmarked List */}
+              {(!currentUser || !currentUser.bookmarkedQuestions || currentUser.bookmarkedQuestions.length === 0) ? (
+                <div className="text-center py-16 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                  <Bookmark className="h-10 w-10 text-slate-350 dark:text-slate-650 mx-auto mb-3" />
+                  <p className="text-slate-600 dark:text-slate-400 text-sm font-bold">No bookmarks saved yet</p>
+                  <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">Bookmark questions during test analysis to view them here.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-w-4xl">
+                  {currentUser.bookmarkedQuestions.map((bm, index) => {
+                    const exam = generateExamSession(bm.testId);
+                    const question = exam.questions.find(q => q.id === bm.questionId);
+                    if (!question) return null;
 
-                const completed = isCompleted(test.id);
+                    const isExpanded = !!expandedBookmarks[bm.questionId];
 
-                return (
-                  <div
-                    key={test.id}
-                    className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-slate-350 dark:hover:border-slate-700 transition flex flex-col justify-between shadow-sm"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                          test.requiredTier === 'None'
-                            ? 'bg-green-100 border border-green-300 text-green-700 dark:bg-green-950/40 dark:border-green-800 dark:text-green-400'
-                            : test.requiredTier === 'Testbook Pass'
-                            ? 'bg-blue-100 border border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400'
-                            : 'bg-yellow-100 border border-yellow-300 text-yellow-700 dark:bg-yellow-950/40 dark:border-yellow-800 dark:text-yellow-400'
-                        }`}>
-                          {test.requiredTier === 'None' ? 'FREE TEST' : test.requiredTier}
-                        </span>
-                        
-                        {hasPass && !completed && (
-                          <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 border border-green-300 dark:border-green-800 px-1.5 py-0.5 rounded font-bold">
-                            <Check className="h-3 w-3" /> UNLOCKED
-                          </span>
-                        )}
-                        {completed && (
-                          <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-400 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded font-black">
-                            <Check className="h-3 w-3" /> ATTEMPTED
-                          </span>
+                    return (
+                      <div key={bm.questionId} className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-all">
+                        <div 
+                          className="flex items-center justify-between cursor-pointer select-none"
+                          onClick={() => toggleExpandBookmark(bm.questionId)}
+                        >
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-900 px-2 py-0.5 rounded text-[9px] font-bold text-blue-600 dark:text-blue-400">
+                                {exam.testTitle}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider font-mono">
+                                Question #{index + 1}
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                              {question.content.en.questionText}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookmark(bm.testId, bm.questionId);
+                              }}
+                              className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
+                              title="Remove Bookmark"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-slate-150 dark:border-slate-850/60 space-y-4">
+                            {/* Question Text */}
+                            <div className="bg-slate-50 dark:bg-slate-900/60 p-4 border border-slate-200 dark:border-slate-800 rounded text-xs leading-relaxed text-slate-850 dark:text-slate-200">
+                              <p className="font-bold text-blue-600 dark:text-blue-400 mb-1">Question (English):</p>
+                              <p className="font-normal mb-3">{question.content.en.questionText}</p>
+                              {question.content.en.mathLatex && (
+                                <p className="mb-3 font-mono text-[10px] text-yellow-600 dark:text-yellow-500 bg-yellow-500/5 px-2 py-1 rounded">LaTeX: {question.content.en.mathLatex}</p>
+                              )}
+                              <p className="font-bold text-blue-600 dark:text-blue-400 mb-1">प्रश्न (Hindi):</p>
+                              <p className="font-normal">{question.content.hi.questionText}</p>
+                              {question.content.hi.mathLatex && (
+                                <p className="mt-3 font-mono text-[10px] text-yellow-600 dark:text-yellow-500 bg-yellow-500/5 px-2 py-1 rounded">LaTeX: {question.content.hi.mathLatex}</p>
+                              )}
+                            </div>
+
+                            {/* Options with Highlighted Correct Answer */}
+                            <div>
+                              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Options & Correct Answer</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {question.content.en.options.map((opt, oIdx) => {
+                                  const textEn = typeof opt === 'string' ? opt : opt.text;
+                                  const textHi = typeof question.content.hi.options[oIdx] === 'string' 
+                                    ? (question.content.hi.options[oIdx] as string) 
+                                    : (question.content.hi.options[oIdx] as any).text;
+                                  const isCorrect = oIdx === question.correctOptionIndex;
+
+                                  return (
+                                    <div 
+                                      key={oIdx} 
+                                      className={`p-3 rounded-lg border text-xs flex flex-col gap-1 ${
+                                        isCorrect 
+                                          ? 'bg-green-50 border-green-300 dark:bg-green-950/20 dark:border-green-900/60 text-green-800 dark:text-green-350 font-semibold' 
+                                          : 'bg-white border-slate-200 dark:bg-slate-900/40 dark:border-slate-800 text-slate-700 dark:text-slate-450'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>Option {oIdx + 1}: {textEn}</span>
+                                        {isCorrect && <Check className="h-3.5 w-3.5 text-green-650 dark:text-green-400" />}
+                                      </div>
+                                      <span className="text-[10px] opacity-80 mt-0.5">हिंदी: {textHi}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Solution Explanation */}
+                            <div className="bg-blue-50/40 dark:bg-blue-950/10 p-4 border border-blue-100 dark:border-blue-900/45 rounded-xl">
+                              <p className="text-[11px] font-bold text-blue-850 dark:text-blue-400 mb-3 uppercase tracking-wide">Explanation / व्याख्या</p>
+                              <div className="space-y-4 text-xs text-slate-700 dark:text-slate-350 leading-relaxed font-normal">
+                                <div>
+                                  <p className="font-bold text-[10px] text-blue-700 dark:text-blue-500 mb-1">ENGLISH EXPLANATION</p>
+                                  <p className="whitespace-pre-line">{EXPLANATIONS[question.id]?.en || "No explanation available."}</p>
+                                </div>
+                                <div className="pt-3 border-t border-blue-100/50 dark:border-blue-950/20">
+                                  <p className="font-bold text-[10px] text-blue-700 dark:text-blue-500 mb-1">हिन्दी व्याख्या</p>
+                                  <p className="whitespace-pre-line">{EXPLANATIONS[question.id]?.hi || "कोई व्याख्या उपलब्ध नहीं है।"}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="mb-6">
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-blue-500" />
+                  {currentCategoryObj?.name} Test Series
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Simulate real examination CBT patterns. Select any card below to begin sitting.</p>
+              </div>
 
-                      <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 leading-snug mb-3 hover:text-blue-650 dark:hover:text-blue-400 transition cursor-pointer">
-                        {test.title}
-                      </h4>
+              {/* Test cards list grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {currentCategoryObj?.tests
+                  .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(test => {
+                    const hasPass = currentUser && (
+                      (test.requiredTier === 'None') ||
+                      (test.requiredTier === 'Testbook Pass' && (currentUser.subscriptionTier === 'Testbook Pass' || currentUser.subscriptionTier === 'Testbook Pass Pro')) ||
+                      (test.requiredTier === 'Testbook Pass Pro' && currentUser.subscriptionTier === 'Testbook Pass Pro')
+                    );
 
-                      <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-900 pt-3 mb-5 text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                    const completed = isCompleted(test.id);
+
+                    return (
+                      <div
+                        key={test.id}
+                        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-slate-350 dark:hover:border-slate-700 transition flex flex-col justify-between shadow-sm"
+                      >
                         <div>
-                          <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Questions</p>
-                          <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.questionsCount} Qs</p>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              test.requiredTier === 'None'
+                                ? 'bg-green-100 border border-green-300 text-green-700 dark:bg-green-950/40 dark:border-green-800 dark:text-green-400'
+                                : test.requiredTier === 'Testbook Pass'
+                                ? 'bg-blue-100 border border-blue-300 text-blue-700 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-400'
+                                : 'bg-yellow-100 border border-yellow-300 text-yellow-700 dark:bg-yellow-950/40 dark:border-yellow-800 dark:text-yellow-400'
+                            }`}>
+                              {test.requiredTier === 'None' ? 'FREE TEST' : test.requiredTier}
+                            </span>
+                            
+                            {hasPass && !completed && (
+                              <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400 border border-green-300 dark:border-green-800 px-1.5 py-0.5 rounded font-bold">
+                                <Check className="h-3 w-3" /> UNLOCKED
+                              </span>
+                            )}
+                            {completed && (
+                              <span className="flex items-center gap-1 text-[9px] bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-400 border border-green-200 dark:border-green-800 px-1.5 py-0.5 rounded font-black">
+                                <Check className="h-3 w-3" /> ATTEMPTED
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 leading-snug mb-3 hover:text-blue-650 dark:hover:text-blue-400 transition cursor-pointer">
+                            {test.title}
+                          </h4>
+
+                          <div className="grid grid-cols-3 gap-2 border-t border-slate-100 dark:border-slate-900 pt-3 mb-5 text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                            <div>
+                              <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Questions</p>
+                              <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.questionsCount} Qs</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Duration</p>
+                              <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.durationMinutes} Mins</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Total Marks</p>
+                              <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.maxMarks} Marks</p>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Duration</p>
-                          <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.durationMinutes} Mins</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider text-[8px]">Total Marks</p>
-                          <p className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{test.maxMarks} Marks</p>
-                        </div>
+
+                        <button
+                          onClick={() => {
+                            if (completed) {
+                              router.push(`/exam/${test.id}/analysis`);
+                            } else {
+                              handleStartExam(test);
+                            }
+                          }}
+                          className={`w-full text-center py-2.5 rounded-lg text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer ${
+                            completed
+                              ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-950/20'
+                              : hasPass
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-900/20'
+                              : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-yellow-900/20'
+                          }`}
+                        >
+                          {completed ? 'View Solution & Analysis' : hasPass ? 'Start Test' : 'Unlock with Pass'}
+                        </button>
                       </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (completed) {
-                          router.push(`/exam/${test.id}/analysis`);
-                        } else {
-                          handleStartExam(test);
-                        }
-                      }}
-                      className={`w-full text-center py-2.5 rounded-lg text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer ${
-                        completed
-                          ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-950/20'
-                          : hasPass
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-900/20'
-                          : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-yellow-900/20'
-                      }`}
-                    >
-                      {completed ? 'View Solution & Analysis' : hasPass ? 'Start Test' : 'Unlock with Pass'}
-                    </button>
-                  </div>
-                );
-              })}
-          </div>
-
+                    );
+                  })}
+              </div>
+            </>
+          )}
         </main>
       </div>
 
